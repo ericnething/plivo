@@ -18,31 +18,33 @@ module Plivo
        , MessageResponse (..)
        ) where
 
-import Control.Monad.Trans.Either
-import Servant.API
-import Servant.Client
-import Data.Proxy
-import Plivo.Message
+import           Control.Monad.Trans.Either
+import           Servant.API
+import           Servant.Client
+import           Data.Proxy
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text (Text)
-import Control.Arrow (first)
-import Data.Monoid ((<>))
+import           Data.Text.Encoding (decodeUtf8)
+import           Control.Arrow (first)
+import           Data.Monoid ((<>))
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Base64 as B64
+
+import           Plivo.Message
 
 newtype AuthId
-  = AuthId {unAuthId :: Text}
-  deriving (ToText, FromText)
-
-newtype AuthToken
-  = AuthToken {unAuthToken :: Text}
+  = AuthId {unAuthId :: ByteString}
   deriving (Show)
 
-instance FromText AuthToken where
-  fromText str = case first T.toLower $ T.break (== ' ') str of
-    ("basic", token) -> Just $ AuthToken token
-    _                -> Nothing
+instance ToText AuthId where
+  toText = decodeUtf8 . unAuthId
+
+newtype AuthToken
+  = AuthToken {unAuthToken :: ByteString}
+  deriving (Show)
 
 instance ToText AuthToken where
-  toText = ("Basic " <>) . unAuthToken
+  toText = ("Basic " <>) . decodeUtf8 . unAuthToken
 
 type PlivoAPI =
      Header "Authorization" AuthToken
@@ -67,5 +69,8 @@ message :: AuthToken
         -> AuthId
         -> Message
         -> IO (Either ServantError MessageResponse)
-message token authId msg = runEitherT $ message' (Just token) authId msg
+message token authId msg = runEitherT $ message' (Just $ creds authId token) authId msg
+
+creds :: AuthId -> AuthToken -> AuthToken
+creds (AuthId authId) (AuthToken token) = AuthToken . B64.encode $ authId <> ":" <> token
 

@@ -42,6 +42,8 @@ library
                      , either
                      , text
                      , aeson
+                     , bytestring
+                     , base64-bytestring
   
   -- Directories containing source files.
   hs-source-dirs:      src
